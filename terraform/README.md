@@ -151,6 +151,58 @@ aws glue get-job-runs --job-name $(terraform output -raw glue_job)
 | glue_job                   | Glue job name                            |
 | glue_database              | Glue catalog database name               |
 
+## Querying Data with Athena
+
+Once the pipeline processes data, you can query it using AWS Athena.
+
+### Example Queries
+
+**View all data for a specific date:**
+```sql
+SELECT *
+FROM "b3-etl-job-database"."b3_stock_refined"
+WHERE date = '2026-03-23'
+LIMIT 10;
+```
+
+**Get latest closing prices by ticker:**
+```sql
+SELECT ticker_cod, date, close, maxima_historica, minima_historica
+FROM "b3-etl-job-database"."b3_stock_refined"
+WHERE date = (SELECT MAX(date) FROM "b3-etl-job-database"."b3_stock_refined")
+ORDER BY ticker_cod;
+```
+
+**Find tickers near historical highs (within 5%):**
+```sql
+SELECT ticker_cod, date, close, maxima_historica,
+       ROUND((close / maxima_historica) * 100, 2) as pct_of_max
+FROM "b3-etl-job-database"."b3_stock_refined"
+WHERE date = (SELECT MAX(date) FROM "b3-etl-job-database"."b3_stock_refined")
+  AND (close / maxima_historica) >= 0.95
+ORDER BY pct_of_max DESC;
+```
+
+**Analyze price ranges for specific ticker:**
+```sql
+SELECT ticker_cod, date, close, maxima_historica, minima_historica,
+       ROUND(maxima_historica - minima_historica, 2) as range_historico
+FROM "b3-etl-job-database"."b3_stock_refined"
+WHERE ticker_cod = 'PETR4'
+ORDER BY date DESC
+LIMIT 30;
+```
+
+**Compare current price to historical average:**
+```sql
+SELECT ticker_cod, date, close,
+       ROUND((maxima_historica + minima_historica) / 2, 2) as media_historica,
+       ROUND(close - (maxima_historica + minima_historica) / 2, 2) as diff_media
+FROM "b3-etl-job-database"."b3_stock_refined"
+WHERE date = (SELECT MAX(date) FROM "b3-etl-job-database"."b3_stock_refined")
+ORDER BY ticker_cod;
+```
+
 ## Cleanup
 
 ```bash
